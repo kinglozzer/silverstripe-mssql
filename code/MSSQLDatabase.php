@@ -7,6 +7,7 @@ use SilverStripe\Core\Injector\Injectable;
 use SilverStripe\Core\ClassInfo;
 use SilverStripe\ORM\ArrayList;
 use SilverStripe\ORM\Connect\Database;
+use SilverStripe\ORM\Connect\PDOConnector;
 use SilverStripe\ORM\DataList;
 use SilverStripe\ORM\DB;
 use SilverStripe\ORM\DataObject;
@@ -462,6 +463,12 @@ class MSSQLDatabase extends Database
             $this->transactionSavepoint('NESTEDTRANSACTION' . $this->transactionNesting);
         } elseif ($this->connector instanceof SQLServerConnector) {
             $this->connector->transactionStart();
+        } elseif ($this->connector instanceof PDOConnector) {
+            // Workaround until a PDOConnector::getPdoConnection() method is added
+            $prop = new \ReflectionProperty($this->connector, 'pdoConnection');
+            $prop->setAccessible(true);
+            $connection = $prop->getValue($this->connector);
+            $connection->beginTransaction();
         } else {
             $this->query('BEGIN TRANSACTION');
         }
@@ -483,6 +490,12 @@ class MSSQLDatabase extends Database
                 $this->transactionRollback('NESTEDTRANSACTION' . $this->transactionNesting);
             } elseif ($this->connector instanceof SQLServerConnector) {
                 $this->connector->transactionRollback();
+            } elseif ($this->connector instanceof PDOConnector) {
+                // Workaround until a PDOConnector::getPdoConnection() method is added
+                $prop = new \ReflectionProperty($this->connector, 'pdoConnection');
+                $prop->setAccessible(true);
+                $connection = $prop->getValue($this->connector);
+                $connection->rollBack();
             } else {
                 $this->query('ROLLBACK TRANSACTION');
             }
@@ -496,6 +509,12 @@ class MSSQLDatabase extends Database
             $this->transactionNesting = 0;
             if ($this->connector instanceof SQLServerConnector) {
                 $this->connector->transactionEnd();
+            } elseif ($this->connector instanceof PDOConnector) {
+                // Workaround until a PDOConnector::getPdoConnection() method is added
+                $prop = new \ReflectionProperty($this->connector, 'pdoConnection');
+                $prop->setAccessible(true);
+                $connection = $prop->getValue($this->connector);
+                $connection->commit();
             } else {
                 $this->query('COMMIT TRANSACTION');
             }
